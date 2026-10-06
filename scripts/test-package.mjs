@@ -13,7 +13,7 @@ function run(command, args, cwd) {
   return result.stdout;
 }
 function pnpm(args, cwd) {
-  return cli.endsWith(".exe") ? run(cli, args, cwd) : run(process.execPath, [cli, ...args], cwd);
+  return /\.[cm]?js$/.test(cli) ? run(process.execPath, [cli, ...args], cwd) : run(cli, args, cwd);
 }
 
 try {
