@@ -1,0 +1,27 @@
+{
+  "name": "opencode-image-generation",
+  "version": "0.1.0",
+  "description": "OpenAI-compatible image generation tools for OpenCode V2",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/JeanRGW/opencode-image-generation.git" },
+  "homepage": "https://github.com/JeanRGW/opencode-image-generation#readme",
+  "bugs": { "url": "https://github.com/JeanRGW/opencode-image-generation/issues" },
+  "keywords": ["opencode", "opencode-plugin", "image-generation", "openai", "omniroute"],
+  "engines": { "node": ">=22.18.0" },
+  "packageManager": "pnpm@12.6.0",
+  "type": "module",
+  "exports": "./index.ts",
+  "files": ["*.ts", "README.md", "LICENSE"],
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "test:package": "node scripts/test-package.mjs"
+  },
+  "dependencies": {
+    "@opencode/plugin": "2.0.24"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}
