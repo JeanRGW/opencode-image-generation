@@ -4,6 +4,7 @@ import { dirname, extname, resolve } from "node:path";
 import { imageInfo } from "./image-info.ts";
 import { readBytes, readJSON, request } from "./http.ts";
 import { validateOutputPath } from "./output-path.ts";
+import { readReferences } from "./references.ts";
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -129,8 +130,21 @@ export async function generate(
   signal: AbortSignal,
   env = process.env,
 ) {
-  if (signal.aborted) throw new Error("Image generation was aborted.");
+  return imageOperation(options, value, directory, signal, env, "generation");
+}
+
+export async function editImage(options: unknown, value: unknown, directory: string, signal: AbortSignal, env = process.env) {
+  return imageOperation(options, value, directory, signal, env, "edit");
+}
+
+async function imageOperation(options: unknown, value: unknown, directory: string, signal: AbortSignal,
+  env: NodeJS.ProcessEnv, operation: "generation" | "edit") {
+  if (signal.aborted) throw new Error(`Image ${operation} was aborted.`);
   const input = record(value);
+  if (operation === "edit") {
+    const allowed = new Set(["prompt", "imagePaths", "model", "outputPath", "size", "quality", "background", "output_format", "response_format"]);
+    if (Object.keys(input).some(key => !allowed.has(key))) throw new Error("Unsupported edit parameter; masks, batches, and generation-only controls are not supported.");
+  }
   if (typeof input.prompt !== "string" || !input.prompt.trim()) throw new Error("A non-empty prompt is required.");
   for (const key of ["outputPath", "model", "size", "aspect_ratio", "image_size", "quality", "background", "output_format", "response_format"]) {
     if (input[key] !== undefined && (typeof input[key] !== "string" || !input[key].trim())) {
@@ -174,14 +188,22 @@ export async function generate(
   for (const key of ["size", "aspect_ratio", "image_size", "quality", "background", "output_format", "response_format"]) {
     if (input[key] !== undefined) body[key] = input[key];
   }
-  const response = await request(config.url, {
+  const url = operation === "edit" ? new URL(config.url.href.replace(/images\/generations$/, "images/edits")) : config.url;
+  if (operation === "edit") {
+    body.images = await readReferences(input.imagePaths, directory, config.maxImageBytes, combinedSignal);
+  }
+  const serialized = JSON.stringify(body);
+  if (operation === "edit" && Buffer.byteLength(serialized) > config.maxResponseBytes) {
+    throw new Error("Image edit request exceeds maxResponseBytes; reduce reference count or size.");
+  }
+  const response = await request(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: serialized,
     signal: combinedSignal,
-  }, "Image generation");
+  }, `Image ${operation}`);
   // Do not echo provider error bodies: they may contain credentials or prompts.
-  if (!response.ok) throw new Error(`Image generation failed (HTTP ${response.status}).`);
+  if (!response.ok) throw new Error(`Image ${operation} failed (HTTP ${response.status}).`);
   const result = record(await readJSON(response, config.maxResponseBytes));
   if (!Array.isArray(result.data) || result.data.length < 1 || result.data.length > count) {
     throw new Error(`Expected one image or up to ${count} images in response.data.`);

@@ -52,7 +52,8 @@ try {
       tool: { transform: async callback => callback({ add: tool => tools.set(tool.name, tool) }) },
       session: { get: async () => ({ location: { directory: process.cwd() } }) },
     });
-    assert.deepEqual([...tools.keys()], ['generate_image', 'list_image_models']);
+    assert.deepEqual([...tools.keys()], ['generate_image', 'edit_image', 'list_image_models']);
+    assert.equal(tools.get('edit_image').options.permission, 'edit_image');
     assert.equal(tools.get('generate_image').options.permission, 'generate_image');
     await assert.rejects(tools.get('generate_image').execute({prompt: ''},
       { signal: new AbortController().signal, sessionID: 'package-test' }), /non-empty prompt/);

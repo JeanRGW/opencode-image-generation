@@ -6,6 +6,8 @@ Works with direct APIs and gateways such as OmniRoute. This is a plugin, not MCP
 - `generate_image`: per-call model selection, batch generation, provider-specific
   controls, and PNG/JPEG/WebP saved locally with actual dimensions.
 - `list_image_models`: authenticated model discovery with advisory tuning guidance.
+- `edit_image`: edit existing local images or use reference images through the
+  JSON `/images/edits` endpoint; saves one new image without overwriting the source.
 - No overwrites, no automatic paid retries, bounded responses, text-only results,
   and no API credentials forwarded to image downloads.
 
@@ -18,7 +20,7 @@ Not compatible with the OpenCode V1 plugin API.
 ### 1. Install from GitHub
 
 ```sh
-opencode plugin add github:JeanRGW/opencode-image-generation#v0.1.0
+opencode plugin add github:JeanRGW/opencode-image-generation#v0.2.0
 ```
 
 This follows OpenCode's [Git package installation](https://opencode.ai/v2/docs/plugins)
@@ -37,7 +39,7 @@ On Windows the usual path is `%USERPROFILE%\.config\opencode\opencode.jsonc`.
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "github:JeanRGW/opencode-image-generation#v0.1.0",
+      "package": "github:JeanRGW/opencode-image-generation#v0.2.0",
       "options": {
         "baseURL": "https://your-provider.example/v1",
         "model": "your-image-model",
@@ -46,7 +48,8 @@ On Windows the usual path is `%USERPROFILE%\.config\opencode\opencode.jsonc`.
     }
   ],
   "permissions": [
-    { "action": "generate_image", "resource": "*", "effect": "ask" }
+    { "action": "generate_image", "resource": "*", "effect": "ask" },
+    { "action": "edit_image", "resource": "*", "effect": "ask" }
   ]
 }
 ```
@@ -159,6 +162,53 @@ not negotiated capabilities, and deployed gateway versions can differ.
 image output modalities, or name heuristics. Catalog visibility does **not** prove
 image-route support, connected credentials, entitlement, or parameter support.
 
+## Editing images
+
+`edit_image` accepts a `prompt` and `imagePaths` (1–4 local PNG/JPEG/WebP paths).
+Optional inputs are `model`, `outputPath`, `size`, `quality`, `background`,
+`output_format`, and `response_format`. It uses the configured default model,
+uploads image bytes as base64 data URLs in `images`, and requests one output.
+
+```json
+{
+  "prompt": "Replace ALPINE DAWN with ALPINE DUSK; preserve the rest",
+  "imagePaths": ["assets/poster.png"],
+  "model": "codex/gpt-5.6-sol-image",
+  "outputPath": "assets/poster-edited.png"
+}
+```
+
+### Generating from reference images
+
+`/images/generations` is text-only, so there is no separate "generate with
+references" tool. To create a new image guided by existing ones, use `edit_image`
+with up to 4 `imagePaths` and describe the new image in the prompt, for example
+"Create a new poster in the style of these two images, featuring a desert canyon".
+This relies on the provider honoring multiple references on `/images/edits`. Codex
+models on OmniRoute accept up to 8 (the plugin caps at 4); most other providers
+accept only one, and Antigravity rejects edits. Live verification confirmed 1, 2, 3,
+and 4 references across the Codex Sol, Terra, and Luna models on OmniRoute.
+
+Paths must resolve inside the invoking session directory, including symlink targets;
+`allowExternalPaths` only enables external **output** writes, not input uploads.
+Original files are not modified. Each input is bounded by `maxImageBytes`, and the
+serialized request is bounded by `maxResponseBytes` (including base64 expansion).
+The existing output byte limits, download-origin allowlist, cancellation, no-retry
+policy, and text-only result shape apply to edits too.
+
+**Only use references you intend to share with the configured provider.** Set the
+`edit_image` permission to `ask`; it controls both local reading/upload and generation.
+The tool does not invoke built-in `read` permission rules separately.
+
+The deployed OmniRoute endpoint was verified with 20 live calls covering headline
+edits on all three Codex image models, PNG and JPEG references, 1–4 reference
+compositions, recolors, relative/absolute/nested/automatic destinations, `size`,
+`response_format`, `quality`, `background`, and `output_format`. Antigravity
+returned an explicit unsupported-provider error. Providers may ignore optional
+controls and return unexpected dimensions, so limits vary by provider. No masks,
+edit batches, remote reference URLs, file IDs, multipart-only APIs, or
+conversational state are supported in this implementation.
+
 ## Troubleshooting
 
 | Symptom | Check |
@@ -171,6 +221,7 @@ image-route support, connected credentials, entitlement, or parameter support.
 | Download origin rejected | Configure the provider's trusted CDN origin, or request supported `b64_json` |
 | Byte limit exceeded | Reduce batch/resolution or explicitly raise the appropriate limit |
 | Output path rejected | Use an in-session path; only opt into external writes if needed |
+| Reference rejected | `edit_image` reads only files that resolve inside the session directory, and accepts 1–4 PNG/JPEG/WebP paths |
 | Timeout or abort | Generation may already be billed; check the provider before retrying |
 
 Provider response bodies and low-level network causes are intentionally not exposed

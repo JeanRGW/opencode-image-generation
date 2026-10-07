@@ -1,5 +1,5 @@
 import { Plugin } from "@opencode/plugin";
-import { configuration, generate, listImageModels } from "./generate.ts";
+import { configuration, editImage, generate, listImageModels } from "./generate.ts";
 
 export default Plugin.define({
   id: "opencode.image-generation",
@@ -33,6 +33,31 @@ export default Plugin.define({
           const image = await generate(ctx.options, input, session.location.directory, context.signal);
           // Local file URIs are not valid image inputs for OpenAI Responses.
           return { content: JSON.stringify(image) };
+        },
+      });
+      editor.add({
+        name: "edit_image",
+        description: "Edit an existing image, or generate a new one guided by local reference images (pass them in imagePaths and describe the new image in the prompt), using POST /images/edits. Uploads image bytes and prompt to the configured API; may incur charges. imagePaths accepts 1–4 PNG/JPEG/WebP files inside the session directory; more references or unsupported parameters may be ignored by the provider. Returns one new image; never overwrites originals. Uses the configured model unless overridden. Editing with 1–4 references was verified on OmniRoute with codex/gpt-5.6-{sol,terra,luna}-image; the antigravity provider rejects edits. No masks or batches. Results are text-only paths; use read to inspect.",
+        input: {
+          type: "object",
+          properties: {
+            prompt: { type: "string", minLength: 1 },
+            imagePaths: { type: "array", minItems: 1, maxItems: 4, items: { type: "string", minLength: 1 }, description: "Local source/reference paths, relative to the session directory. File bytes are uploaded to the provider." },
+            model: { type: "string", minLength: 1 },
+            outputPath: { type: "string", minLength: 1, description: "New destination; must not exist. Originals are never overwritten." },
+            size: { type: "string", minLength: 1 },
+            quality: { type: "string", minLength: 1 },
+            background: { type: "string", minLength: 1 },
+            output_format: { type: "string", enum: ["png", "jpeg", "webp"] },
+            response_format: { type: "string", enum: ["url", "b64_json"] },
+          },
+          required: ["prompt", "imagePaths"],
+          additionalProperties: false,
+        },
+        options: { codemode: false, permission: "edit_image" },
+        async execute(input, context) {
+          const session = await ctx.session.get({ sessionID: context.sessionID });
+          return { content: JSON.stringify(await editImage(ctx.options, input, session.location.directory, context.signal)) };
         },
       });
       editor.add({

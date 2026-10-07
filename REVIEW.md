@@ -1,3 +1,30 @@
+# Release review: 0.2.0
+
+## Added in 0.2.0
+
+- `edit_image` calls the JSON `/images/edits` route, reusing the generation
+  configuration, byte limits, download allowlist, cancellation, no-retry policy,
+  and exclusive no-overwrite writes.
+- Local reference uploads accept 1–4 PNG/JPEG/WebP files, resolve and read them
+  with bounded streaming, and require them to stay inside the session directory
+  even when external output writes are enabled.
+- Reject masks, batches, and generation-only controls instead of silently
+  dropping them; register a dedicated `edit_image` permission.
+- Add mock coverage for reference uploads, multi-reference bodies, path
+  confinement, symlink escapes, request-size limits, and tool registration.
+
+## Live verification
+
+Twenty billed calls against the deployed OmniRoute endpoint passed: headline edits
+on Sol/Terra/Luna, PNG and JPEG references, 1–4 reference compositions, recolors,
+relative/absolute/nested/automatic destinations, and `size`, `response_format`,
+`quality`, `background`, and `output_format`. Sources were byte-identical after the
+run and every output differed from its input. Antigravity still rejects edits.
+
+Observed provider behavior: requested `size` is not always honored (`1024x1024`
+returned `1024x1536`), and `quality`/`background` had no reliable effect, so those
+remain advisory.
+
 # Release review: 0.1.0
 
 ## Fixed before publication

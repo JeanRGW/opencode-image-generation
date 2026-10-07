@@ -28,6 +28,10 @@ not full image decoding or integrity. Saved files should still be treated as
 untrusted input when opened by another application.
 
 Errors deliberately exclude provider response bodies and low-level network causes.
+The `edit_image` tool uploads local reference bytes to the configured API. References
+must resolve inside the session directory, even when external output is enabled.
+Approve only images you intend to disclose. The custom `edit_image` permission covers
+reading/uploading as well as generation; built-in `read` rules are not checked.
 Generation is never automatically retried: failure, timeout, or cancellation does
 not prove that the upstream job stopped or that no charge occurred. A failed write
 may leave an incomplete newly created file; it is reported rather than overwritten
